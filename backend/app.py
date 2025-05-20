@@ -1,7 +1,8 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from model import load_data, train_model  # Your model functions
+from model import load_data, train_model, haversine  # Your model functions
 import numpy as np
+import pandas as pd
 
 app = FastAPI()
 
@@ -18,32 +19,43 @@ appraisals = load_data()
 model, scaler = train_model(appraisals)  # Your training function
 
 @app.post("/get_comps")
-async def get_comps(subject: dict):
+async def get_comps(request_data: dict):
     try:
-        # Process candidates (mock example - adapt to your data)
-        candidates = subject.pop('candidates')
+        subject = request_data['subject']
+        candidates = request_data['candidates']
         
-        # Generate features (use your actual feature engineering)
+        # Generate features
         features = []
         for c in candidates:
-            feat = [
+            # Calculate time difference in months
+            sale_date_diff = (pd.to_datetime(c['sale_date']) - pd.to_datetime(subject['sale_date'])).days // 30
+            
+            features.append([
                 abs(subject['gla'] - c['gla']),
                 abs(subject['lot_size'] - c['lot_size']),
-                # ... add other features
-            ]
-            features.append(feat)
+                sale_date_diff,
+                haversine(subject['lat'], subject['lon'], c['lat'], c['lon'])
+            ])
             
-        # Scale and predict
-        scaled_features = scaler.transform(features)
-        probs = model.predict_proba(scaled_features)[:, 1]
+        # Rest of your prediction code...
+        return {"comps": comps, "explanations": explanations}
         
-        # Get top 3 comps
-        top3_idx = np.argsort(probs)[-3:][::-1]
-        
-        return {
-            "comps": [candidates[i] for i in top3_idx],
-            "explanations": []  # Add SHAP explanations here
-        }
-        
+    except KeyError as e:
+        raise HTTPException(status_code=400, detail=f"Missing field: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@app.get("/get_candidates/{appraisal_id}")
+async def get_candidates(appraisal_id: str):
+    try:
+        appraisal = next(a for a in appraisals if a['id'] == appraisal_id)
+        return {
+            "subject": appraisal['subject'],
+            "candidates": appraisal['candidates']
+        }
+    except StopIteration:
+        raise HTTPException(status_code=404, detail="Appraisal not found")
+    
+@app.get("/get_appraisal_ids")
+async def get_appraisal_ids():
+    return [a['id'] for a in appraisals]

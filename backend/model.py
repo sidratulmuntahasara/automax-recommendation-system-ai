@@ -5,14 +5,21 @@ from sklearn.preprocessing import StandardScaler
 import xgboost as xgb
 import json
 import shap
+from geopy.distance import great_circle  # Add this import
+
+def haversine(lat1, lon1, lat2, lon2):
+    """Calculate distance between two geographic points"""
+    return great_circle((lat1, lon1), (lat2, lon2)).miles  # or .km for kilometers
 
 def load_data():
     with open('appraisals_dataset.json') as f:
         appraisals = json.load(f)
     
-    # Verify structure
     print(f"Loaded {len(appraisals)} appraisals")
-    print("Sample keys:", appraisals[0].keys())
+    # Verify structure
+    if len(appraisals) > 0:
+        print("Sample subject keys:", appraisals[0]['subject'].keys())
+        print("Sample candidate keys:", appraisals[0]['candidates'][0].keys())
     
     return appraisals
 

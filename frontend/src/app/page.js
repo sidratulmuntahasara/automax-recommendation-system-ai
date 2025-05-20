@@ -1,28 +1,37 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import axios from 'axios'
 
 export default function Home() {
-  const [subject, setSubject] = useState({
-    gla: '',
-    lot_size: '',
-    // ... other fields
-  })
+  const [appraisalId, setAppraisalId] = useState('')
+  const [subject, setSubject] = useState(null)
+  const [candidates, setCandidates] = useState([])
   const [results, setResults] = useState(null)
+
+  // Load available appraisal IDs
+  useEffect(() => {
+    axios.get('http://localhost:8000/get_appraisal_ids')
+      .then(res => setAppraisalIds(res.data))
+      .catch(console.error)
+  }, [])
+
+  const loadAppraisal = async () => {
+    try {
+      const res = await axios.get(`http://localhost:8000/get_candidates/${appraisalId}`)
+      setSubject(res.data.subject)
+      setCandidates(res.data.candidates)
+    } catch (err) {
+      console.error('Error loading appraisal:', err)
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
     try {
       const response = await axios.post('http://localhost:8000/get_comps', {
-        ...subject,
-        candidates: [] // This should be filled with the actual candidates
-      }, {
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        subject: subject,
+        candidates: candidates
       })
-      
       setResults(response.data)
     } catch (err) {
       console.error('API Error:', err)
@@ -33,29 +42,41 @@ export default function Home() {
     <div className="container mx-auto p-4">
       <h1 className="text-2xl mb-4">Property Comp Finder</h1>
       
-      <form onSubmit={handleSubmit} className="max-w-md">
-        <div className="grid gap-4">
-          <div>
-            <label className="block">Living Area (sqft)</label>
-            <input
-              type="number"
-              value={subject.gla}
-              onChange={e => setSubject({...subject, gla: e.target.value})}
-              className="w-full p-2 border rounded"
-            />
+      <div className="mb-6">
+        <label className="block mb-2">Select Appraisal ID</label>
+        <input
+          type="text"
+          value={appraisalId}
+          onChange={e => setAppraisalId(e.target.value)}
+          className="p-2 border rounded mr-2"
+        />
+        <button
+          onClick={loadAppraisal}
+          className="bg-gray-200 p-2 rounded hover:bg-gray-300"
+        >
+          Load Property
+        </button>
+      </div>
+
+      {subject && (
+        <form onSubmit={handleSubmit}>
+          {/* Display subject property info */}
+          <div className="mb-6">
+            <h2 className="text-xl mb-2">Subject Property</h2>
+            <p>GLA: {subject.gla} sqft</p>
+            <p>Lot Size: {subject.lot_size}</p>
+            {/* Add other subject details */}
           </div>
-          
-          {/* Add other fields */}
-          
+
           <button
             type="submit"
             className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
           >
             Find Comps
           </button>
-        </div>
-      </form>
-
+        </form>
+      )}
+      
       {results && (
         <div className="mt-8">
           <h2 className="text-xl mb-4">Top 3 Comps</h2>
