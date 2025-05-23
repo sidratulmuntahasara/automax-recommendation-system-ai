@@ -1,12 +1,13 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from model import load_data, train_model, haversine  # Your model functions
+from model import load_data, train_model, haversine, clean_numeric
 import numpy as np
 import pandas as pd
+from datetime import datetime
 
 app = FastAPI()
 
-# Enable CORS for Next.js frontend
+# CORS Configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
@@ -14,9 +15,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load data and model at startup
-appraisals = load_data()
-model, scaler = train_model(appraisals)  # Your training function
+try:
+    appraisals = load_data()
+    model, scaler = train_model(appraisals)
+except Exception as e:
+    print(f"FATAL ERROR DURING STARTUP: {str(e)}")
+    raise SystemExit(1)
+
+@app.get("/get_appraisal_ids")
+async def get_appraisal_ids():
+    return [str(a['orderID']) for a in appraisals if 'orderID' in a]
+
+@app.get("/get_candidates/{appraisal_id}")
+async def get_candidates(appraisal_id: str):
+    try:
+        appraisal = next(a for a in appraisals if str(a.get('orderID', '')) == appraisal_id)
+        return {
+            "subject": appraisal['subject'],
+            "candidates": appraisal['properties']
+        }
+    except StopIteration:
+        raise HTTPException(status_code=404, detail="Appraisal not found")
+    except KeyError as e:
+        raise HTTPException(status_code=500, detail=f"Invalid data structure: {str(e)}")
 
 @app.post("/get_comps")
 async def get_comps(request_data: dict):
@@ -24,38 +45,45 @@ async def get_comps(request_data: dict):
         subject = request_data['subject']
         candidates = request_data['candidates']
         
-        # Generate features
         features = []
         for c in candidates:
-            # Calculate time difference in months
-            sale_date_diff = (pd.to_datetime(c['sale_date']) - pd.to_datetime(subject['sale_date'])).days // 30
-            
-            features.append([
-                abs(subject['gla'] - c['gla']),
-                abs(subject['lot_size'] - c['lot_size']),
-                sale_date_diff,
-                haversine(subject['lat'], subject['lon'], c['lat'], c['lon'])
-            ])
-            
-        # Rest of your prediction code...
-        return {"comps": comps, "explanations": explanations}
+            try:
+                # Clean and convert all values
+                sub_gla = clean_numeric(subject['gla'])
+                cand_gla = clean_numeric(c['gla'])
+                sub_lot = clean_numeric(subject['lot_size'])
+                cand_lot = clean_numeric(c.get('lot_size_sf', 0))
+                
+                # Date handling
+                sale_date = datetime.strptime(subject['sale_date'], "%b/%d/%Y")
+                candidate_date = datetime.strptime(c['close_date'], "%Y-%m-%d")
+                month_diff = (candidate_date - sale_date).days // 30
+                
+                # Geography
+                geo_dist = haversine(
+                    clean_numeric(subject['lat']),
+                    clean_numeric(subject['lon']),
+                    clean_numeric(c['latitude']),
+                    clean_numeric(c['longitude'])
+                )
+                
+                features.append([
+                    abs(sub_gla - cand_gla),
+                    abs(sub_lot - cand_lot),
+                    month_diff,
+                    geo_dist
+                ])
+            except Exception as e:
+                print(f"Skipping candidate: {str(e)}")
+                continue
         
-    except KeyError as e:
-        raise HTTPException(status_code=400, detail=f"Missing field: {str(e)}")
+        if not features:
+            return {"comps": []}
+            
+        scaled_features = scaler.transform(features)
+        probs = model.predict_proba(scaled_features)[:, 1]
+        top3 = np.argsort(probs)[-3:][::-1]
+        return {"comps": [candidates[i] for i in top3]}
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
-@app.get("/get_candidates/{appraisal_id}")
-async def get_candidates(appraisal_id: str):
-    try:
-        appraisal = next(a for a in appraisals if a['id'] == appraisal_id)
-        return {
-            "subject": appraisal['subject'],
-            "candidates": appraisal['candidates']
-        }
-    except StopIteration:
-        raise HTTPException(status_code=404, detail="Appraisal not found")
-    
-@app.get("/get_appraisal_ids")
-async def get_appraisal_ids():
-    return [a['id'] for a in appraisals]
