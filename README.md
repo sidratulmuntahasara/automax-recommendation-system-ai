@@ -52,7 +52,7 @@ pip install -r requirements.txt
 cd ../frontend
 npm install
 ```
-**4. Running the System**
+**4. Running the System**\
 ***Start Backend***
 ```bash
 cd backend
