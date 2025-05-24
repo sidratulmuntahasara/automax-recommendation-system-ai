@@ -49,8 +49,8 @@ def clean_dataset(input_file, output_file):
         subject = appraisal['subject']
         subject['gla'] = clean_numeric(subject['gla'])
         subject['lot_size'] = clean_numeric(subject['lot_size_sf'])
-        # subject['year_built'] = int(clean_numeric(subject['year_built']))
-        # subject['sale_date'] = clean_date(subject['sale_date'])
+        subject['year_built'] = int(clean_numeric(subject['year_built']))
+        subject['sale_date'] = clean_date(subject['sale_date'])
         
         # Clean candidates (properties)
         for prop in appraisal['properties']:
