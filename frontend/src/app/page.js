@@ -23,33 +23,52 @@ export default function Home() {
     fetchIds()
   }, [])
 
+  const safeParseFloat = (value, fallback = 0) => {
+    try {
+      const cleaned = String(value).replace(/[^\d.]/g, '')
+      return parseFloat(cleaned) || fallback
+    } catch {
+      return fallback
+    }
+  }
+
   const loadAppraisal = async () => {
     if (!appraisalId) return
     setLoading(true)
     setError(null)
+    
     try {
       const res = await axios.get(`http://localhost:8000/get_candidates/${appraisalId}`)
       
-      // Transform numeric fields
+      // Transform subject property
+      const rawSubject = res.data.subject || {}
       const transformedSubject = {
-        ...res.data.subject,
-        lat: parseFloat(res.data.subject.lat),
-        lon: parseFloat(res.data.subject.lon),
-        gla: parseFloat(res.data.subject.gla.replace(/[^\d.]/g, '')),
-        lot_size: parseFloat(res.data.subject.lot_size.replace(/[^\d.]/g, ''))
+        address: rawSubject.address || 'Address not available',
+        lat: safeParseFloat(rawSubject.lat),
+        lon: safeParseFloat(rawSubject.lon),
+        gla: safeParseFloat(rawSubject.gla),
+        lot_size: safeParseFloat(rawSubject.lot_size),
+        year_built: rawSubject.year_built || 'N/A',
+        effective_date: rawSubject.effective_date || 'Unknown'
       }
-      
-      const transformedCandidates = res.data.candidates.map(c => ({
-        ...c,
-        lat: parseFloat(c.latitude),
-        lon: parseFloat(c.longitude),
-        gla: parseFloat((c.gla || '').replace(/[^\d.]/g, '')),
-        lot_size: parseFloat((c.lot_size_sf || '').replace(/[^\d.]/g, ''))
+
+      // Transform candidates
+      const transformedCandidates = (res.data.candidates || []).map(c => ({
+        address: c.address || 'Address not available',
+        close_price: c.close_price ? parseInt(c.close_price) : 0,
+        lat: safeParseFloat(c.latitude),
+        lon: safeParseFloat(c.longitude),
+        gla: safeParseFloat(c.gla),
+        lot_size_sf: safeParseFloat(c.lot_size_sf),
+        close_date: c.close_date || 'Unknown',
+        beds: c.beds || 0,
+        baths: c.baths || 0
       }))
 
       setSubject(transformedSubject)
-      setCandidates(transformedCandidates)
+      setCandidates(transformedCandidates.filter(c => c.lat && c.lon)) // Filter invalid locations
       setResults(null)
+      
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to load property data')
     } finally {
@@ -61,14 +80,22 @@ export default function Home() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    
     try {
       const response = await axios.post('http://localhost:8000/get_comps', {
         subject: subject,
         candidates: candidates
       })
-      setResults(response.data)
+      
+      setResults({
+        comps: response.data.comps.map(comp => ({
+          ...comp,
+          distance: comp.distance ? Math.round(comp.distance * 100) / 100 : 0
+        }))
+      })
+      
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to find comps')
+      setError(err.response?.data?.detail || 'Failed to find comparables')
     } finally {
       setLoading(false)
     }
@@ -76,7 +103,7 @@ export default function Home() {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl mb-4">Property Comp Finder</h1>
+      <h1 className="text-2xl mb-4">Property Recommendation System</h1>
       
       {error && (
         <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
@@ -84,6 +111,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* Appraisal ID Selection */}
       <div className="mb-6">
         <label className="block mb-2 font-medium">Select Appraisal ID</label>
         <div className="flex items-center gap-2">
@@ -100,7 +128,7 @@ export default function Home() {
           </select>
           <button
             onClick={loadAppraisal}
-            className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600 whitespace-nowrap disabled:opacity-50"
+            className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600 disabled:opacity-50"
             disabled={!appraisalId || loading}
           >
             {loading ? 'Loading...' : 'Load Property'}
@@ -108,27 +136,16 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Subject Property Display */}
       {subject && (
         <form onSubmit={handleSubmit} className="mb-8">
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
             <h2 className="text-xl mb-2 font-semibold">Subject Property</h2>
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="font-medium">Address:</p>
-                <p>{subject.address}</p>
-              </div>
-              <div>
-                <p className="font-medium">GLA:</p>
-                <p>{subject.gla.toLocaleString()} sqft</p>
-              </div>
-              <div>
-                <p className="font-medium">Lot Size:</p>
-                <p>{subject.lot_size.toLocaleString()} sqft</p>
-              </div>
-              <div>
-                <p className="font-medium">Year Built:</p>
-                <p>{subject.year_built}</p>
-              </div>
+              <PropertyField label="Address" value={subject.address} />
+              <PropertyField label="GLA" value={`${subject.gla.toLocaleString()} sqft`} />
+              <PropertyField label="Lot Size" value={`${subject.lot_size.toLocaleString()} sqft`} />
+              <PropertyField label="Year Built" value={subject.year_built} />
             </div>
           </div>
 
@@ -141,37 +158,49 @@ export default function Home() {
           </button>
         </form>
       )}
-      
+
+      {/* Results Display */}
       {results && (
         <div className="mt-8">
-          <h2 className="text-xl mb-4 font-semibold">Top 3 Comparable Properties</h2>
+          <h2 className="text-xl mb-4 font-semibold">Top Comparable Properties</h2>
           <div className="space-y-4">
-            {results.comps.map((comp, i) => (
-              <div key={i} className="p-4 border rounded-lg bg-white shadow-sm">
-                <h3 className="font-bold text-lg mb-2">Comp #{i+1}</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="font-medium">Address:</p>
-                    <p>{comp.address}</p>
+            {results.comps.length > 0 ? (
+              results.comps.map((comp, i) => (
+                <div key={i} className="p-4 border rounded-lg bg-white shadow-sm">
+                  <h3 className="font-bold text-lg mb-2">Comp #{i+1}</h3>
+                  <div className="grid grid-cols-2 gap-4 mb-3">
+                    <PropertyField label="Address" value={comp.address} />
+                    <PropertyField label="Sale Price" value={`$${comp.close_price?.toLocaleString() || 'N/A'}`} />
+                    <PropertyField label="Size" value={`${comp.gla?.toLocaleString()} sqft`} />
+                    <PropertyField label="Distance" value={`${comp.distance} miles`} />
                   </div>
-                  <div>
-                    <p className="font-medium">Sale Price:</p>
-                    <p>${comp.close_price?.toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium">Size:</p>
-                    <p>{comp.gla?.toLocaleString()} sqft</p>
-                  </div>
-                  <div>
-                    <p className="font-medium">Distance:</p>
-                    <p>{Math.round(comp.distance * 100) / 100} miles</p>
-                  </div>
+                  {comp.reasons?.length > 0 && (
+                    <div className="pt-3 border-t">
+                      <p className="text-sm font-medium text-gray-600">Matching Features:</p>
+                      <ul className="list-disc list-inside">
+                        {comp.reasons.map((reason, j) => (
+                          <li key={j} className="text-sm text-gray-500">{reason}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
+              ))
+            ) : (
+              <div className="p-4 text-center text-gray-500">
+                No comparable properties found
               </div>
-            ))}
+            )}
           </div>
         </div>
       )}
     </div>
   )
 }
+
+const PropertyField = ({ label, value }) => (
+  <div>
+    <p className="font-medium">{label}:</p>
+    <p className="truncate">{value || 'N/A'}</p>
+  </div>
+)

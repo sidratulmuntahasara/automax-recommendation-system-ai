@@ -6,9 +6,18 @@ import xgboost as xgb
 import json
 import re
 from datetime import datetime
+from math import radians, sin, cos, sqrt, atan2
+
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371  # Earth radius in km
+    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1-a))
+    return R * c * 0.621371  # Convert to miles
 
 def clean_numeric(value):
-    """Convert string with units to float, handling missing values."""
     if isinstance(value, (int, float)):
         return float(value)
     try:
@@ -17,78 +26,92 @@ def clean_numeric(value):
         return 0.0
 
 def load_data():
-    with open('cleaned_appraisals.json') as f:
-        data = json.load(f)
-    return data['appraisals']
+    try:
+        with open('cleaned_appraisals.json') as f:
+            data = json.load(f)
+        return data.get('appraisals', [])
+    except Exception as e:
+        print(f"Error loading data: {str(e)}")
+        return []
 
 def process_data(appraisals):
     data = []
     for appraisal in appraisals:
-        subject = appraisal['subject']
-        candidates = appraisal['properties']
-        # Normalize comp addresses for comparison
-        comp_addresses = [c['address'].strip().lower() for c in appraisal['comps']]
-        
-        for candidate in candidates:
-            try:
-                # --- Feature 1: GLA Difference ---
-                sub_gla = clean_numeric(subject.get('gla', 0))
-                cand_gla = clean_numeric(candidate.get('gla', 0))
-                gla_diff = abs(sub_gla - cand_gla)
+        try:
+            subject = appraisal.get('subject', {})
+            candidates = appraisal.get('properties', [])
+            comp_addresses = [c.get('address', '').strip().lower() 
+                            for c in appraisal.get('comps', [])]
+            
+            for candidate in candidates:
+                # Feature calculations
+                gla_diff = abs(clean_numeric(subject.get('gla', 0)) - 
+                          clean_numeric(candidate.get('gla', 0)))
                 
-                # --- Feature 2: Lot Size Difference ---
-                sub_lot = clean_numeric(subject.get('lot_size', 0))  # Subject uses 'lot_size'
-                cand_lot = clean_numeric(candidate.get('lot_size_sf', 0))  # Candidate uses 'lot_size_sf'
-                lot_diff = abs(sub_lot - cand_lot)
+                lot_diff = abs(clean_numeric(subject.get('lot_size', 0)) - 
+                          clean_numeric(candidate.get('lot_size_sf', 0)))
                 
-                # --- Feature 3: Sale Date Difference (Months) ---
-                # Parse subject's effective date
-                eff_date = datetime.strptime(subject['effective_date'], '%b/%d/%Y')
-                # Parse candidate's close date
-                close_date = datetime.strptime(candidate['close_date'], '%Y-%m-%d')
-                sale_month_diff = abs((eff_date - close_date).days) // 30
+                try:
+                    eff_date = datetime.strptime(
+                        subject.get('effective_date', 'Jan/1/2000'), "%b/%d/%Y")
+                    close_date = datetime.strptime(
+                        candidate.get('close_date', '2000-01-01'), "%Y-%m-%d")
+                    month_diff = abs((eff_date - close_date).days) // 30
+                except:
+                    month_diff = 36  # Default to 3 years if invalid date
                 
-                # --- Target Variable ---
-                # Check if candidate is a comp (address match)
-                cand_addr = candidate['address'].strip().lower()
-                target = 1 if cand_addr in comp_addresses else 0
+                distance = haversine(
+                    subject.get('lat', 0),
+                    subject.get('lon', 0),
+                    candidate.get('lat', 0),
+                    candidate.get('lon', 0)
+                )
+                
+                # Target variable
+                target = 1 if candidate.get('address', '').strip().lower() in comp_addresses else 0
                 
                 data.append([
                     gla_diff,
                     lot_diff,
-                    sale_month_diff,
+                    month_diff,
+                    distance,
                     target,
-                    str(appraisal['orderID'])
+                    str(appraisal.get('orderID', ''))
                 ])
-            except Exception as e:
-                print(f"Skipping candidate due to error: {str(e)}")
-                continue
-    
+        except Exception as e:
+            print(f"Skipping appraisal: {str(e)}")
+            continue
+            
     return pd.DataFrame(
-        data, 
-        columns=['gla_diff', 'lot_diff', 'sale_month_diff', 'target', 'appraisal_id']
+        data,
+        columns=['gla_diff', 'lot_diff', 'month_diff', 'distance', 'target', 'appraisal_id']
     )
 
 def train_model(appraisals):
     df = process_data(appraisals)
     
-    if len(df) == 0:
-        raise ValueError("No valid data processed - check dataset formatting")
+    if df.empty:
+        raise ValueError("No valid data processed")
     
-    # Split by appraisal ID to avoid data leakage
+    # Split data without leakage
     unique_ids = df['appraisal_id'].unique()
-    train_ids, val_ids = train_test_split(unique_ids, test_size=0.2, random_state=42)
+    train_ids, test_ids = train_test_split(unique_ids, test_size=0.2, random_state=42)
     
-    # Prepare data
-    X_train = df[df['appraisal_id'].isin(train_ids)].drop(['target', 'appraisal_id'], axis=1)
-    y_train = df[df['appraisal_id'].isin(train_ids)]['target']
+    X_train = df[df.appraisal_id.isin(train_ids)].drop(
+        ['target', 'appraisal_id'], axis=1)
+    y_train = df[df.appraisal_id.isin(train_ids)].target
     
-    # Scale features
+    # Feature scaling
     scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
+    X_scaled = scaler.fit_transform(X_train)
     
-    # Train model
-    model = xgb.XGBClassifier()
-    model.fit(X_train_scaled, y_train)
+    # Model training
+    model = xgb.XGBClassifier(
+        objective='binary:logistic',
+        n_estimators=100,
+        max_depth=5,
+        learning_rate=0.1
+    )
+    model.fit(X_scaled, y_train)
     
     return model, scaler
