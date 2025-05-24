@@ -2,8 +2,8 @@
 
 _An intelligent comparables recommendation engine for real estate valuation_
 
-![System Demo](https://via.placeholder.com/800x400.png?text=System+Demo+GIF) 
-*Replace with actual demo image*
+![screencapture-localhost-3000-2025-05-24-11_26_56](https://github.com/user-attachments/assets/e8452b9d-3f21-46ce-9783-9116a86cc792)
+
 
 ## Features
 
