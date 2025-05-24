@@ -12,7 +12,7 @@ export default function Home() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    const fetchIds = async () => {
+        const fetchIds = async () => {
       try {
         const res = await axios.get('http://localhost:8000/get_appraisal_ids')
         setAppraisalIds(res.data)
@@ -121,9 +121,14 @@ export default function Home() {
             className="p-2 border rounded w-full max-w-xs bg-white"
             disabled={loading || appraisalIds.length === 0}
           >
-            <option value="" disabled>Select an Appraisal ID</option>
-            {appraisalIds.map(id => (
-              <option key={id} value={id}>{id}</option>
+            <option value="" disabled>Select a Property</option>
+            {appraisalIds.map(appraisal => (
+              <option 
+                key={appraisal.id} 
+                value={appraisal.id}
+              >
+                {appraisal.address} (ID: {appraisal.id})
+              </option>
             ))}
           </select>
           <button

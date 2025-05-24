@@ -29,7 +29,10 @@ except Exception as e:
 @app.get("/get_appraisal_ids")
 async def get_appraisal_ids():
     try:
-        return [str(a['orderID']) for a in appraisals if 'orderID' in a]
+        return [{
+            "id": str(a['orderID']),
+            "address": a.get('subject', {}).get('address', 'Address not available')
+        } for a in appraisals if 'orderID' in a]
     except Exception as e:
         logging.error(f"Error getting IDs: {str(e)}")
         raise HTTPException(status_code=500, detail="Error loading appraisal IDs")
