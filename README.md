@@ -98,20 +98,17 @@ Visual explanations for matches
 ![deepseek_mermaid_20250524_f28066](https://github.com/user-attachments/assets/232debe0-b41d-4c99-9320-fd21b8855026)
 
 ### Key Metrics Considered
-&nbsp;&nbsp;&nbsp;Feature&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Weight&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description
---------------  ------  --------------------------
-&nbsp;&nbsp;Living Area&nbsp;&nbsp;&nbsp;&nbsp;30%&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;GLA within 100 sqft
---------------  ------  --------------------------
-&nbsp;&nbsp;&nbsp;Recency&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;25%&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Sold <90 days preferred
---------------  ------  --------------------------
-&nbsp;&nbsp;&nbsp;Location&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;20%&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<1 mile radius ideal
---------------  ------  -------------------
-&nbsp;&nbsp;&nbsp;Lot Size&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;15%&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Similar dimensions
---------------  ------  -------------------
-&nbsp;&nbsp;&nbsp;Bed/Bath&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;10%&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Exact match preferred
+|   Feature     | Weight  |  Description               |
+|---|---|---|
+|   Living Area |  30%    |  GLA within 100 sqft       |
+|   Recency     |  25%    |  Sold <90 days preferred   |
+|   Location    |  20%    |  <1 mile radius ideal      |
+|   Lot Size    |  15%    |  Similar dimensions        |
+|   Bed/Bath    |  10%    |  Exact match preferred     |
 
 
-💡 Future Improvements
+
+### Future Improvements
 - Add map visualization for properties
 - Include price/square foot metrics
 - Support custom search filters
