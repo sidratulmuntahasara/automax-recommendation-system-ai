@@ -1,6 +1,6 @@
 # Property Recommendation System
 
-_A intelligent comparables recommendation engine for real estate valuation_
+_An intelligent comparables recommendation engine for real estate valuation_
 
 ![System Demo](https://via.placeholder.com/800x400.png?text=System+Demo+GIF) 
 *Replace with actual demo image*
@@ -64,18 +64,32 @@ cd frontend
 npm run dev
 ```
 
-### 📂 Project Setup
+### 📂 Project Structure
 ```bash
 .
 ├── backend
-│   ├── app.py               # API endpoints
-│   ├── model.py             # ML model training
-│   ├── cleaned_appraisals.json  # Sample data
-│   └── requirements.txt     # Python dependencies
+│ ├── app.py # FastAPI endpoints and core logic
+│ ├── model.py # ML model training and scoring
+│ ├── data_cleaner.py # Data normalization/preprocessing
+│ ├── appraisals_dataset.json # Raw appraisal data
+│ ├── cleaned_appraisals.json # Processed appraisal data
+│ ├── requirements.txt Python dependencies
+│ └── pycache # Python compiled bytecode
 ├── frontend
-│   ├── page.js              # Main UI component
-│   └── package.json         # Frontend dependencies
-└── README.md
+│ ├── src/app
+│ │ ├── page.js # Main UI component
+│ │ ├── layout.js # Root layout component
+│ │ └── globals.css # Global CSS styles
+│ ├── public
+│ │ └── favicon.ico # Application icon
+│ ├── .next # Next.js build output
+│ ├── node_modules # Frontend dependencies
+│ ├── package.json # Frontend dependencies and scripts
+│ ├── jsconfig.json # JavaScript configuration
+│ └── next.config.mjs # Next.js configuration
+├── .gitignore # Version control ignore rules
+├── LICENSE # Software license
+└── README.md # This documentation file
 ```
 
 ### 🛠️ Usage Guide
@@ -105,3 +119,4 @@ Visual explanations for matches
 - Include price/square foot metrics
 - Support custom search filters
 - Implement historical price trends
+- Reiterate user feedback and improve model's learning
