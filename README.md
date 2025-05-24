@@ -79,17 +79,9 @@ npm run dev
 ```
 
 ### 🛠️ Usage Guide
-- Select Subject Property
-Choose from dropdown showing formatted addresses with IDs:
-```bash
-123 Maple Street, Springfield (ID: APP-123)
-456 Oak Avenue, Shelbyville (ID: APP-456)
-```
-- View Property Details
-System displays key subject property characteristics
-
-- Generate Recommendations
-Click "Find Comparable Properties" to get:
+- Select Subject Property : Choose from dropdown showing formatted addresses with IDs
+- View Property Details : System displays key subject property characteristics
+- Generate Recommendations : Click "Find Comparable Properties" to get:
 Top 3 matching properties
 Sale prices and distances
 Visual explanations for matches
