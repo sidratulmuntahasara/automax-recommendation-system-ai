@@ -1,8 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from model import load_data, train_model, haversine, clean_numeric
+from model import load_data, train_model, clean_numeric
 import numpy as np
-import pandas as pd
 from datetime import datetime
 
 app = FastAPI()
@@ -46,44 +45,39 @@ async def get_comps(request_data: dict):
         candidates = request_data['candidates']
         
         features = []
+        valid_candidates = []
+        
         for c in candidates:
             try:
-                # Clean and convert all values
-                sub_gla = clean_numeric(subject['gla'])
-                cand_gla = clean_numeric(c['gla'])
-                sub_lot = clean_numeric(subject['lot_size'])
-                cand_lot = clean_numeric(c.get('lot_size_sf', 0))
+                # Clean and convert values with error handling
+                sub_gla = clean_numeric(subject.get('gla', 0))
+                cand_gla = clean_numeric(c.get('gla', 0))
+                gla_diff = abs(sub_gla - cand_gla)
                 
-                # Date handling
-                sale_date = datetime.strptime(subject['sale_date'], "%b/%d/%Y")
-                candidate_date = datetime.strptime(c['close_date'], "%Y-%m-%d")
-                month_diff = (candidate_date - sale_date).days // 30
+                sub_lot = clean_numeric(subject.get('lot_size', 0))  # Subject field
+                cand_lot = clean_numeric(c.get('lot_size_sf', 0))    # Candidate field
+                lot_diff = abs(sub_lot - cand_lot)
                 
-                # Geography
-                geo_dist = haversine(
-                    clean_numeric(subject['lat']),
-                    clean_numeric(subject['lon']),
-                    clean_numeric(c['latitude']),
-                    clean_numeric(c['longitude'])
-                )
+                # Date handling with format validation
+                eff_date = datetime.strptime(subject['effective_date'], "%b/%d/%Y")
+                close_date = datetime.strptime(c['close_date'], "%Y-%m-%d")
+                month_diff = abs((eff_date - close_date).days) // 30
                 
-                features.append([
-                    abs(sub_gla - cand_gla),
-                    abs(sub_lot - cand_lot),
-                    month_diff,
-                    geo_dist
-                ])
+                features.append([gla_diff, lot_diff, month_diff])
+                valid_candidates.append(c)
+                
             except Exception as e:
-                print(f"Skipping candidate: {str(e)}")
+                print(f"Skipping candidate {c.get('address')}: {str(e)}")
                 continue
         
         if not features:
             return {"comps": []}
             
+        # Ensure we have matching candidates and features
         scaled_features = scaler.transform(features)
         probs = model.predict_proba(scaled_features)[:, 1]
         top3 = np.argsort(probs)[-3:][::-1]
-        return {"comps": [candidates[i] for i in top3]}
+        return {"comps": [valid_candidates[i] for i in top3]}
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
