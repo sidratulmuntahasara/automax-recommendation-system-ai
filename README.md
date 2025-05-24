@@ -81,9 +81,9 @@ npm run dev
 ### 🛠️ Usage Guide
 - Select Subject Property : Choose from dropdown showing formatted addresses with IDs
 - View Property Details : System displays key subject property characteristics
-- Generate Recommendations : Click "Find Comparable Properties" to get:
-Top 3 matching properties
-Sale prices and distances
+- Generate Recommendations : Click "Find Comparable Properties" to get:\
+Top 3 matching properties\
+Sale prices and distances\
 Visual explanations for matches
 
 ### Technical Highlights
