@@ -111,3 +111,8 @@ Visual explanations for matches
 &nbsp;&nbsp;&nbsp;Bed/Bath&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;10%&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Exact match preferred
 
 
+💡 Future Improvements
+- Add map visualization for properties
+- Include price/square foot metrics
+- Support custom search filters
+- Implement historical price trends
